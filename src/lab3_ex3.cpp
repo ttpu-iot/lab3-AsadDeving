@@ -18,6 +18,10 @@
 #include "WiFi.h"
 #include <ArduinoJson.h>
 #include "PubSubClient.h"
+#include <Wire.h>
+#include <hd44780.h>
+#include <hd44780ioClass/hd44780_I2Cexp.h>
+
 const int RedLED = 26; // Red LED pin
 const int GreenLED = 27; // Green LED pin
 const int BlueLED = 14; // Blue LED pin
@@ -25,14 +29,19 @@ const int YellowLED = 12; // Yellow LED pin
 const int But = 25; // Button pin
 const int LightSensor = 33; // Light sensor pin
 
+hd44780_I2Cexp lcd;  // Auto-detect I2C address
+const int LCD_COLS = 16;
+const int LCD_ROWS = 2;
+
+
 const char* ssid = "Wokwi-GUEST";
 const char* password = "";
 
 // MQTT Broker settings
-const char* mqtt_broker = "<test.mosquitto.org>";  // Free public MQTT broker
+const char* mqtt_broker = "mqtt.iotserver.uz";  // Free public MQTT broker
 const int mqtt_port = 1883;
-const char* mqtt_username = "<username>";  // username given in the telegram group
-const char* mqtt_password = "<password>";  // password given in the telegram group
+const char* mqtt_username = "userTTPU";  // username given in the telegram group
+const char* mqtt_password = "mqttpass";  // password given in the telegram group
 
 const char* mqtt_topic_green = "ttpu/iot/asadullo/ledgreen";   // Topic to publish
 const char* mqtt_topic_red = "ttpu/iot/asadullo/ledgred";    // Topic to subscribe
@@ -40,6 +49,7 @@ const char* mqtt_topic_blue = "ttpu/iot/asadullo/ledblue";   // Topic to publish
 const char* mqtt_topic_yellow = "ttpu/iot/asadullo/ledyellow";   // Topic to publish
 const char* mqtt_topic_sensor = "ttpu/iot/asadullo/light"; 
 const char* mqtt_topic_button = "ttpu/iot/asadullo/button";   
+const char* mqtt_topic_lcd = "ttpu/iot/asadullo/display";
 WiFiClient espClient;
 PubSubClient mqtt_client(espClient);
 
@@ -60,10 +70,28 @@ void setup()
   digitalWrite(BlueLED, LOW);
   digitalWrite(YellowLED, LOW);
 
+  int status = lcd.begin(LCD_COLS, LCD_ROWS);
+  if (status) {
+    Serial.println("LCD initialization failed!");
+    Serial.print("Status code: ");
+    Serial.println(status);
+    hd44780::fatalError(status);
+  }
+  
+  Serial.println("LCD initialized successfully!");
+  
+  // Clear LCD and display initial message
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Initializing...");
+  delay(1000);
+
   connectWiFi();
   mqtt_client.setServer(mqtt_broker, mqtt_port);
   mqtt_client.setCallback(mqqtCallback);
   connectMQTT();
+
+
 }
 
 void loop() 
@@ -98,14 +126,18 @@ void loop()
       Serial.println("Failed to publish message!");
     }
   }
+  
   //Decetct button press
   static int lastbtnstate = LOW;
   int currentbtnstate = digitalRead(But);
   static unsigned long lastdebouncetime = 0;
   currentTime = millis();
-  if (currentTime != lastbtnstate && (currentTime - lastdebouncetime) > 100){
+
+  if (currentbtnstate != lastbtnstate && (currentTime - lastdebouncetime) > 100) {
+
     lastbtnstate = currentbtnstate;
     String btnmsg="";
+
     if (currentbtnstate == HIGH){
       btnmsg="Button Pressed";
       Serial.println(btnmsg);
@@ -114,14 +146,17 @@ void loop()
       btnmsg="Button Released";
       Serial.println(btnmsg);
     }
+
     JsonDocument btndoc;
     btndoc["event"] = btnmsg;
     btndoc["timestamp"] = millis();
     char btnEventMsg[256];
-    serializeJson(btndoc, btnEventMsg);  
+    serializeJson(btndoc, btnEventMsg); 
+
     if (mqtt_client.publish(mqtt_topic_sensor, btnEventMsg)) {
       Serial.println("Button event published successfully!");
-    } else {
+    } 
+    else {
       Serial.println("Failed to publish button event!");
     }
   }
@@ -147,6 +182,13 @@ void connectMQTT(void){
     String client_id = "esp32-client-" + String(WiFi.macAddress());
     if (mqtt_client.connect(client_id.c_str(), mqtt_username, mqtt_password)) {
       Serial.println("Connected to MQTT broker!"); 
+      //Connected, now subscribe to topic
+      mqtt_client.subscribe(mqtt_topic_red);
+      mqtt_client.subscribe(mqtt_topic_green);
+      mqtt_client.subscribe(mqtt_topic_blue);
+      mqtt_client.subscribe(mqtt_topic_yellow);
+      mqtt_client.subscribe(mqtt_topic_lcd);
+
     } else {
       Serial.print("Failed to connect, rc=");
       Serial.print(mqtt_client.state());
@@ -155,6 +197,7 @@ void connectMQTT(void){
     }  
   }
 }
+
 void mqqtCallback(char* topic, byte* payload, unsigned int length){
   Serial.print("Message arrived in topic: ");
   Serial.println(topic);
@@ -191,6 +234,14 @@ void mqqtCallback(char* topic, byte* payload, unsigned int length){
     Serial.println(error.c_str());
     return;
   }
+  
+  if(topicStr == mqtt_topic_lcd && doc.containsKey("text")){
+    String lcdMsg = doc["text"].as<String>();
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(lcdMsg);
+  }
+
   String state_value = "";
   if (doc.containsKey("state")){
     state_value = doc["state"].as<String>();

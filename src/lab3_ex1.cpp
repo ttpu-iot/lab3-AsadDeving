@@ -29,7 +29,7 @@ const char* ssid = "Wokwi-GUEST";
 const char* password = "";
 
 // MQTT Broker settings
-const char* mqtt_broker = "<test.mosquitto.org>";  // Free public MQTT broker
+const char* mqtt_broker = "mqtt.iotserver.uz";  // Free public MQTT broker
 const int mqtt_port = 1883;
 const char* mqtt_username = "userTTPU";  // username given in the telegram group
 const char* mqtt_password = "mqttpass";  // password given in the telegram group
@@ -96,7 +96,7 @@ void loop(){
   int currentbtnstate = digitalRead(But);
   static unsigned long lastdebouncetime = 0;
   currentTime = millis();
-  if (currentTime != lastbtnstate && (currentTime - lastdebouncetime) > 100){
+  if (currentbtnstate != lastbtnstate && (currentTime - lastdebouncetime) > 100){
     lastbtnstate = currentbtnstate;
     String btnmsg="";
     if (currentbtnstate == HIGH){

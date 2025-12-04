@@ -28,10 +28,10 @@ const char* ssid = "Wokwi-GUEST";
 const char* password = "";
 
 // MQTT Broker settings
-const char* mqtt_broker = "<test.mosquitto.org>";  // Free public MQTT broker
+const char* mqtt_broker = "mqtt.iotserver.uz";  // Free public MQTT broker
 const int mqtt_port = 1883;
-const char* mqtt_username = "<username>";  // username given in the telegram group
-const char* mqtt_password = "<password>";  // password given in the telegram group
+const char* mqtt_username = "userTTPU";  // username given in the telegram group
+const char* mqtt_password = "mqttpass";  // password given in the telegram group
 
 const char* mqtt_topic_green = "ttpu/iot/asadullo/ledgreen";   // Topic to publish
 const char* mqtt_topic_red = "ttpu/iot/asadullo/ledgred";    // Topic to subscribe
@@ -95,6 +95,10 @@ void connectMQTT(void){
     String client_id = "esp32-client-" + String(WiFi.macAddress());
     if (mqtt_client.connect(client_id.c_str(), mqtt_username, mqtt_password)) {
       Serial.println("Connected to MQTT broker!"); 
+      mqtt_client.subscribe(mqtt_topic_red);
+      mqtt_client.subscribe(mqtt_topic_green);
+      mqtt_client.subscribe(mqtt_topic_blue);
+      mqtt_client.subscribe(mqtt_topic_yellow);
     } else {
       Serial.print("Failed to connect, rc=");
       Serial.print(mqtt_client.state());
